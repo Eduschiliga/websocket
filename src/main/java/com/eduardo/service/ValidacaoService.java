@@ -2,7 +2,7 @@ package com.eduardo.service;
 
 import java.util.regex.Pattern;
 
-public class ValidarService {
+public class ValidacaoService {
   static boolean isValidSenha(String senha) {
     return senha != null && senha.length() >= 8 && senha.length() <= 20 && Pattern.matches("^[a-zA-Z]+$", senha);
   }

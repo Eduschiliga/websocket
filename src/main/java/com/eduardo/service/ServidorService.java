@@ -1,6 +1,7 @@
 package com.eduardo.service;
 
 import com.eduardo.dao.UsuarioDAO;
+import com.eduardo.exceptions.UsuarioJaExisteException;
 import com.eduardo.model.*;
 import com.eduardo.utils.JPAUtil;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,6 +16,8 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 
 @NoArgsConstructor
 public class ServidorService extends Thread {
@@ -76,9 +79,8 @@ public class ServidorService extends Thread {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonNode = objectMapper.readTree(inputLine);
         operacao = jsonNode.get("operacao").asText();
-
-
         Mensagem mensagem = new Mensagem();
+
         try {
           EntityManager entityManager = JPAUtil.getEntityManagerFactory();
           UsuarioDAO usuarioDAO = new UsuarioDAO(entityManager);
@@ -87,6 +89,32 @@ public class ServidorService extends Thread {
           if (operacao.equals("cadastrarUsuario")) {
             try {
               UsuarioCliente usuarioCliente = Json.deserialize(inputLine, UsuarioCliente.class);
+
+              List<String> mesagemValidacao = new ArrayList<String>();
+
+              boolean isValidRa = ValidacaoService.isValidRa(usuarioCliente.getRa());
+              boolean isValidSenha = ValidacaoService.isValidSenha(usuarioCliente.getSenha());
+              boolean isValidNome = ValidacaoService.isValidNome(usuarioCliente.getNome());
+
+              if (!isValidRa) {
+                mesagemValidacao.add("RA");
+              }
+
+              if (!isValidSenha) {
+                mesagemValidacao.add("Senha");
+              }
+
+              if (!isValidNome) {
+                mesagemValidacao.add("Nome");
+              }
+
+              if (!mesagemValidacao.isEmpty()) {
+                throw new IllegalArgumentException(String.join(", ", mesagemValidacao));
+              }
+
+              if (usuarioDAO.buscarPorRa(usuarioCliente.getRa()) != null) {
+                throw new UsuarioJaExisteException("Usuário com o RA: " + usuarioCliente.getRa() + " já existe.");
+              }
 
               entityManager.getTransaction().begin();
 
@@ -100,6 +128,18 @@ public class ServidorService extends Thread {
 
               mensagem.setMensagem("Usuário cadastrado com sucesso!");
               mensagem.setStatus(201);
+
+            } catch (IllegalArgumentException e) {
+              mensagem.setMensagem("Campos inválidos: " + e.getMessage());
+              mensagem.setStatus(401);
+            } catch (UsuarioJaExisteException e) {
+              if (entityManager.getTransaction().isActive()) {
+                entityManager.getTransaction().rollback();
+              }
+              mensagem.setMensagem(e.getMessage());
+              mensagem.setStatus(401);
+
+              System.out.println(mensagem.getMensagem());
             } catch (Exception e) {
               if (entityManager.getTransaction().isActive()) {
                 entityManager.getTransaction().rollback();
@@ -110,13 +150,31 @@ public class ServidorService extends Thread {
             }
           }
 
+          if (operacao.equals("logout")) {
+            try {
+              Logout logout = Json.deserialize(inputLine, Logout.class);
+
+              UsuarioServidor usuarioServidor = usuarioDAO.buscarPorRa(logout.getToken());
+
+              if (usuarioServidor != null) {
+                autenticado = false;
+                mensagem.setStatus(200);
+                mensagem.setMensagem("Logout realizado com sucesso!");
+              }
+            } catch (NoResultException e) {
+              mensagem.setMensagem("Usuário inválido!");
+              mensagem.setStatus(401);
+            }
+
+          }
+
           if (operacao.equals("login")) {
             try {
               Login login = objectMapper.treeToValue(jsonNode, Login.class);
 
               UsuarioServidor usuarioServidor = usuarioDAO.buscarPorRaESenha(login.getRa(), login.getSenha());
 
-              if(usuarioServidor != null) {
+              if (usuarioServidor != null) {
                 autenticado = true;
                 mensagemLoginSucesso.setStatus(200);
                 mensagemLoginSucesso.setToken(usuarioServidor.getRa());
@@ -134,6 +192,7 @@ public class ServidorService extends Thread {
           mensagem.setStatus(401);
         } finally {
           if ("cadastrarUsuario".equals(operacao)) {
+            System.out.println(mensagem.getMensagem());
             mensagemJson = objectMapper.writeValueAsString(mensagem);
           }
 
@@ -144,6 +203,11 @@ public class ServidorService extends Thread {
           if ("login".equals(operacao) && !autenticado) {
             mensagemJson = objectMapper.writeValueAsString(mensagem);
           }
+
+          if (operacao.equals("logout") && !autenticado) {
+            mensagemJson = objectMapper.writeValueAsString(mensagem);
+          }
+
           out.println(mensagemJson);
         }
 
@@ -163,4 +227,5 @@ public class ServidorService extends Thread {
       }
     }
   }
+
 }

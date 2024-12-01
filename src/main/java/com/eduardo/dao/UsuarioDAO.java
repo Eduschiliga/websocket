@@ -1,5 +1,6 @@
 package com.eduardo.dao;
 
+import com.eduardo.exceptions.UsuarioJaExisteException;
 import com.eduardo.model.UsuarioServidor;
 import lombok.*;
 
@@ -16,16 +17,11 @@ public class UsuarioDAO {
   public void cadastrar(UsuarioServidor usuarioServidor) {
     try {
       System.out.println("Usuario recebido para cadastrar: " + usuarioServidor);
+
       entityManager.merge(usuarioServidor);
     } catch (Exception e) {
       e.printStackTrace();
     }
-  }
-
-  public void logar() {
-  }
-
-  public void deslogar() {
   }
 
   public UsuarioServidor buscarPorRa(String ra) {
