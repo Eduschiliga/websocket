@@ -23,7 +23,6 @@ import javax.validation.constraints.Pattern;
 public class UsuarioServidor {
   @Id
   @Column(name = "ra_usuario", unique = true)
-  @Pattern(regexp = "^[0-9]{7}$", message = "RA deve conter 7 dígitos numéricos")
   private String ra;
 
   @Column(name = "is_admin_usuario")
@@ -31,14 +30,9 @@ public class UsuarioServidor {
 
   @Column(name = "nome_usuario")
   @NotNull(message = "O nome é obrigatório")
-  @Max(value = 50, message = "O nome deve ter no máximo 50 letras sem acentos ou caracteres especiais")
-  @Pattern(regexp = "^[A-Z ]*$", message = "O nome deve ter no máximo 50 letras sem acentos ou caracteres especiais")
   private String nome;
 
   @Column(name = "senha_usuario")
   @NotNull(message = "A senha é obrigatória")
-  @Min(value = 8, message = "A senha deve ter de 8 a 20 letras sem acentos ou caracteres especiais")
-  @Max(value = 20, message = "A senha deve ter de 8 a 20 letras sem acentos ou caracteres especiais")
-  @Pattern(regexp = "^[a-zA-Z0-9]*$", message = "A senha deve ter de 8 a 20 letras sem acentos ou caracteres especiais")
   private String senha;
 }

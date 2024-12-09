@@ -17,7 +17,9 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @NoArgsConstructor
 public class ServidorService extends Thread {
@@ -35,7 +37,7 @@ public class ServidorService extends Thread {
     ServerSocket serverSocket = null;
 
     try {
-      serverSocket = new ServerSocket(20000);
+      serverSocket = new ServerSocket(20001);
       System.out.println("Conexão de Socket criada");
       try {
         while (true) {
@@ -78,6 +80,9 @@ public class ServidorService extends Thread {
       while ((inputLine = in.readLine()) != null) {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonNode = objectMapper.readTree(inputLine);
+
+        System.out.println(jsonNode);
+        System.out.println(inputLine);
         operacao = jsonNode.get("operacao").asText();
         Mensagem mensagem = new Mensagem();
 
@@ -112,9 +117,9 @@ public class ServidorService extends Thread {
                 throw new IllegalArgumentException(String.join(", ", mesagemValidacao));
               }
 
-              if (usuarioDAO.buscarPorRa(usuarioCliente.getRa()) != null) {
-                throw new UsuarioJaExisteException("Usuário com o RA: " + usuarioCliente.getRa() + " já existe.");
-              }
+//              if (usuarioDAO.buscarPorRa(usuarioCliente.getRa()) != null) {
+//                throw new UsuarioJaExisteException("Usuário com o RA: " + usuarioCliente.getRa() + " já existe.");
+//              }
 
               entityManager.getTransaction().begin();
 
@@ -130,17 +135,20 @@ public class ServidorService extends Thread {
               mensagem.setStatus(201);
 
             } catch (IllegalArgumentException e) {
-              mensagem.setMensagem("Campos inválidos: " + e.getMessage());
+              mensagem.setMensagem("Erro ao cadastrar: " + e.getMessage());
               mensagem.setStatus(401);
-            } catch (UsuarioJaExisteException e) {
-              if (entityManager.getTransaction().isActive()) {
-                entityManager.getTransaction().rollback();
-              }
-              mensagem.setMensagem(e.getMessage());
-              mensagem.setStatus(401);
+            }
+//            catch (UsuarioJaExisteException e) {
+//              if (entityManager.getTransaction().isActive()) {
+//                entityManager.getTransaction().rollback();
+//              }
+//              mensagem.setMensagem(e.getMessage());
+//              mensagem.setStatus(401);
+//
+//              System.out.println(mensagem.getMensagem());
+//            }
 
-              System.out.println(mensagem.getMensagem());
-            } catch (Exception e) {
+            catch (Exception e) {
               if (entityManager.getTransaction().isActive()) {
                 entityManager.getTransaction().rollback();
               }
@@ -151,21 +159,8 @@ public class ServidorService extends Thread {
           }
 
           if (operacao.equals("logout")) {
-            try {
-              Logout logout = Json.deserialize(inputLine, Logout.class);
-
-              UsuarioServidor usuarioServidor = usuarioDAO.buscarPorRa(logout.getToken());
-
-              if (usuarioServidor != null) {
                 autenticado = false;
                 mensagem.setStatus(200);
-                mensagem.setMensagem("Logout realizado com sucesso!");
-              }
-            } catch (NoResultException e) {
-              mensagem.setMensagem("Usuário inválido!");
-              mensagem.setStatus(401);
-            }
-
           }
 
           if (operacao.equals("login")) {
@@ -191,6 +186,8 @@ public class ServidorService extends Thread {
           mensagem.setMensagem("Não foi possível ler o json recebido");
           mensagem.setStatus(401);
         } finally {
+          mensagem.setOperacao(operacao);
+
           if ("cadastrarUsuario".equals(operacao)) {
             System.out.println(mensagem.getMensagem());
             mensagemJson = objectMapper.writeValueAsString(mensagem);
@@ -205,8 +202,13 @@ public class ServidorService extends Thread {
           }
 
           if (operacao.equals("logout") && !autenticado) {
-            mensagemJson = objectMapper.writeValueAsString(mensagem);
+            Map<String, Integer> statusMap = new HashMap<>();
+            statusMap.put("status", 200);
+
+            mensagemJson = objectMapper.writeValueAsString(statusMap);
           }
+
+          System.out.println(mensagemJson);
 
           out.println(mensagemJson);
         }
